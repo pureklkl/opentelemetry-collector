@@ -17,6 +17,8 @@ package telemetrylogs // import "go.opentelemetry.io/collector/service/internal/
 import (
 	"flag"
 
+	grpcSettable "github.com/grpc-ecosystem/go-grpc-middleware/logging/settable"
+	grpcZap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -35,6 +37,8 @@ var (
 	loggerLevelPtr   = &defaultLogValue
 	loggerProfilePtr = &defaultLogValue
 	loggerFormatPtr  = &defaultLogValue
+	// Service reloading will create a new logger. Use settable logger to allow replace grpc logger after grpc initialized.
+	settableLogger = grpcSettable.ReplaceGrpcLoggerV2()
 )
 
 // Flags adds flags related to service telemetry logs to the given flagset.
@@ -72,6 +76,7 @@ func NewLogger(cfg config.ServiceTelemetryLogs, options []zap.Option) (*zap.Logg
 	if err != nil {
 		return nil, err
 	}
+	grpcZap.SetGrpcLoggerV2(settableLogger, logger)
 	logDeprecatedMessages(logger)
 	return logger, nil
 }

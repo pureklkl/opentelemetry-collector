@@ -108,7 +108,10 @@ func TestCollector_Start(t *testing.T) {
 
 	loggingHookCalled := false
 	hook := func(entry zapcore.Entry) error {
-		loggingHookCalled = true
+		// zapGrap will call it in different goroutings, add a check t avoid race condition.
+		if !loggingHookCalled {
+			loggingHookCalled = true
+		}
 		return nil
 	}
 
