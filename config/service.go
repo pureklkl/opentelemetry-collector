@@ -58,23 +58,23 @@ type ServiceTelemetryLogs struct {
 
 	// DisableCaller stops annotating logs with the calling function's file
 	// name and line number. By default, all logs are annotated.
-	DisableCaller bool `json:"disableCaller" yaml:"disableCaller"`
+	DisableCaller bool `mapstructure:"disableCaller"`
 
 	// DisableStacktrace completely disables automatic stacktrace capturing. By
 	// default, stacktraces are captured for WarnLevel and above logs in
 	// development and ErrorLevel and above in production.
-	DisableStacktrace bool `json:"disableStacktrace" yaml:"disableStacktrace"`
+	DisableStacktrace bool `mapstructure:"disableStacktrace"`
 
 	// Sampling sets a sampling policy. A nil SamplingConfig disables sampling.
-	Sampling *SamplingConfig `json:"sampling" yaml:"sampling"`
+	Sampling *SamplingConfig `mapstructure:"sampling"`
 
 	// EncoderConfig sets options for the chosen encoder. See
 	// zapcore.EncoderConfig for details.
-	EncoderConfig zapcore.EncoderConfig `json:"encoderConfig" yaml:"encoderConfig"`
+	EncoderConfig zapcore.EncoderConfig `mapstructure:"encoderConfig"`
 
 	// OutputPaths is a list of URLs or file paths to write logging output to.
 	// See Open for details.
-	OutputPaths []string `json:"outputPaths" yaml:"outputPaths"`
+	OutputPaths []string `mapstructure:"outputPaths"`
 
 	// ErrorOutputPaths is a list of URLs to write internal logger errors to.
 	// The default is standard error.
@@ -82,10 +82,10 @@ type ServiceTelemetryLogs struct {
 	// Note that this setting only affects internal errors; for sample code that
 	// sends error-level logs to a different location from info- and debug-level
 	// logs, see the package-level AdvancedConfiguration example.
-	ErrorOutputPaths []string `json:"errorOutputPaths" yaml:"errorOutputPaths"`
+	ErrorOutputPaths []string `mapstructure:"errorOutputPaths"`
 
 	// InitialFields is a collection of fields to add to the root logger.
-	InitialFields map[string]interface{} `json:"initialFields" yaml:"initialFields"`
+	InitialFields map[string]interface{} `mapstructure:"initialFields"`
 
 }
 
@@ -99,35 +99,38 @@ type ServiceTelemetryLogs struct {
 // Values configured here are per-second. See zapcore.NewSamplerWithOptions for
 // details.
 type SamplingConfig struct {
-	Initial    int                                           `json:"initial" yaml:"initial"`
-	Thereafter int                                           `json:"thereafter" yaml:"thereafter"`
-	Hook       func(zapcore.Entry, zapcore.SamplingDecision) `json:"-" yaml:"-"`
+	Initial    int                                           `mapstructure:"initial"`
+	Thereafter int                                           `mapstructure:"thereafter"`
+	Hook       func(zapcore.Entry, zapcore.SamplingDecision) `mapstructure:"-"`
 }
 
 type EncoderConfig struct {
 	// Set the keys used for each log entry. If any key is empty, that portion
 	// of the entry is omitted.
-	MessageKey    string `json:"messageKey" yaml:"messageKey"`
-	LevelKey      string `json:"levelKey" yaml:"levelKey"`
-	TimeKey       string `json:"timeKey" yaml:"timeKey"`
-	NameKey       string `json:"nameKey" yaml:"nameKey"`
-	CallerKey     string `json:"callerKey" yaml:"callerKey"`
-	FunctionKey   string `json:"functionKey" yaml:"functionKey"`
-	StacktraceKey string `json:"stacktraceKey" yaml:"stacktraceKey"`
-	LineEnding    string `json:"lineEnding" yaml:"lineEnding"`
+	MessageKey    string `mapstructure:"messageKey"`
+	LevelKey      string `mapstructure:"levelKey"`
+	TimeKey       string `mapstructure:"timeKey"`
+	NameKey       string `mapstructure:"nameKey"`
+	CallerKey     string `mapstructure:"callerKey"`
+	FunctionKey   string `mapstructure:"functionKey"`
+	StacktraceKey string `mapstructure:"stacktraceKey"`
+	LineEnding    string `mapstructure:"lineEnding"`
+
 	// Configure the primitive representations of common complex types. For
 	// example, some users may want all time.Times serialized as floating-point
 	// seconds since epoch, while others may prefer ISO8601 strings.
-	EncodeLevel    zapcore.LevelEncoder    `json:"levelEncoder" yaml:"levelEncoder"`
-	EncodeTime     zapcore.TimeEncoder     `json:"timeEncoder" yaml:"timeEncoder"`
-	EncodeDuration zapcore.DurationEncoder `json:"durationEncoder" yaml:"durationEncoder"`
-	EncodeCaller   zapcore.CallerEncoder   `json:"callerEncoder" yaml:"callerEncoder"`
+	EncodeLevel    zapcore.LevelEncoder    `mapstructure:"levelEncoder"`
+	EncodeTime     zapcore.TimeEncoder     `mapstructure:"timeEncoder"`
+	EncodeDuration zapcore.DurationEncoder `mapstructure:"durationEncoder"`
+	EncodeCaller   zapcore.CallerEncoder   `mapstructure:"callerEncoder"`
+
 	// Unlike the other primitive type encoders, EncodeName is optional. The
 	// zero value falls back to FullNameEncoder.
-	EncodeName zapcore.NameEncoder `json:"nameEncoder" yaml:"nameEncoder"`
+	EncodeName zapcore.NameEncoder `mapstructure:"nameEncoder"`
+
 	// Configures the field separator used by the console encoder. Defaults
 	// to tab.
-	ConsoleSeparator string `json:"consoleSeparator" yaml:"consoleSeparator"`
+	ConsoleSeparator string `mapstructure:"consoleSeparator"`
 }
 
 func (srvTL *ServiceTelemetryLogs) validate() error {
