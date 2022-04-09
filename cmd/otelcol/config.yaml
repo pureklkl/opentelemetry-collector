@@ -8,14 +8,16 @@ receivers:
   otlp:
     protocols:
       grpc:
-      http:
 
 processors:
   batch:
+    send_batch_size: 1000
+    timeout: 10s
 
 exporters:
   logging:
     logLevel: debug
+  otlphttp:
 
 service:
 
@@ -24,11 +26,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [otlphttp, logging]
 
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [otlphttp, logging]
 
   extensions: [memory_ballast, zpages]

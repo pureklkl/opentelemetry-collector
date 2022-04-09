@@ -2,36 +2,37 @@ extensions:
   memory_ballast:
     size_mib: 512
   zpages:
-    endpoint: 0.0.0.0:55679
+    endpoint: 0.0.0.0:55680
 
 receivers:
   otlp:
     protocols:
-      grpc:
-      http:
+      grpc: 
+        endpoint: "localhost:5137"
 
 processors:
   batch:
-  memory_limiter:
-    # 75% of maximum memory up to 4G
-    limit_mib: 1536
-    # 25% of limit up to 2G
-    spike_limit_mib: 512
-    check_interval: 5s
+    send_batch_size: 1000
+    timeout: 10s
 
 exporters:
   logging:
     logLevel: debug
+  otlphttp:
+    endpoint: "http://localhost:4318"
 
 service:
+
   pipelines:
+
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [logging]
+      processors: [batch]
+      exporters: [otlphttp, logging]
+
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [logging]
+      processors: [batch]
+      exporters: [otlphttp, logging]
 
   extensions: [memory_ballast, zpages]
