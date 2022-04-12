@@ -22,9 +22,10 @@ exporters:
     endpoint: "http://localhost:4318"
 
 service:
-
+  telemetry:
+    logs:
+      level: "DEBUG"
   pipelines:
-
     traces:
       receivers: [otlp]
       processors: [batch]

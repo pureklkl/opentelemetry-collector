@@ -37,6 +37,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumererror"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/internal/middleware"
+	"go.opentelemetry.io/collector/internal/otlptext"
 	"go.opentelemetry.io/collector/model/otlp"
 	"go.opentelemetry.io/collector/model/pdata"
 )
@@ -55,6 +56,11 @@ var (
 	tracesMarshaler  = otlp.NewProtobufTracesMarshaler()
 	metricsMarshaler = otlp.NewProtobufMetricsMarshaler()
 	logsMarshaler    = otlp.NewProtobufLogsMarshaler()
+
+	// debug propose
+	debugTraceMarhsaller  = otlptext.NewTextTracesMarshaler()
+	debugMetricMarshaller = otlptext.NewTextMetricsMarshaler()
+	debugLoggerMarshaller = otlptext.NewTextLogsMarshaler()
 )
 
 const (
@@ -109,6 +115,17 @@ func (e *exporter) pushTraces(ctx context.Context, td pdata.Traces) error {
 }
 
 func (e *exporter) pushMetrics(ctx context.Context, md pdata.Metrics) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextMetricWithErrorHandled(md)
+		defer func() {
+			if r := recover(); r != nil {
+				e.logger.Debug("Before panic: " + string(beforeMarshal))
+				e.logger.Debug("Panic: " + e.logTextMetricWithErrorHandled(md))
+				panic(e)
+			}
+		}()
+	}
+	md.ResourceMetrics().At(0).Resource().Attributes().Insert("exportKey", pdata.NewAttributeValueString("value"))
 	request, err := metricsMarshaler.MarshalMetrics(md)
 	if err != nil {
 		return consumererror.Permanent(err)
@@ -212,4 +229,13 @@ func readResponse(resp *http.Response) *status.Status {
 	}
 
 	return respStatus
+}
+
+func (e *exporter) logTextMetricWithErrorHandled(md pdata.Metrics) string {
+	buf, err := debugMetricMarshaller.MarshalMetrics(md)
+	if err != nil {
+		e.logger.Debug("Text Marshal failed: %v", zap.Error(err))
+		return "Text marshal metrics failed."
+	}
+	return string(buf)
 }

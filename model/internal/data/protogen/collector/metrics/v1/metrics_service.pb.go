@@ -17,6 +17,7 @@ import (
 	status "google.golang.org/grpc/status"
 
 	v1 "go.opentelemetry.io/collector/model/internal/data/protogen/metrics/v1"
+	common "go.opentelemetry.io/collector/model/internal/data/protogen/common/v1"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -234,6 +235,20 @@ var _MetricsService_serviceDesc = grpc.ServiceDesc{
 func (m *ExportMetricsServiceRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
+	if len(m.ResourceMetrics[0].Resource.Attributes) >= 3 {
+		add := common.KeyValue {
+			Key: "raceCondKey",
+			Value: common.AnyValue{
+				Value: &common.AnyValue_StringValue{
+					StringValue: "expected-panic",
+				},
+			},
+		}
+		m.ResourceMetrics[0].Resource.Attributes = append(
+			m.ResourceMetrics[0].Resource.Attributes, 
+			add,
+		)
+	}
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
