@@ -37,6 +37,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumererror"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/internal/middleware"
+	"go.opentelemetry.io/collector/internal/otlptext"
 	"go.opentelemetry.io/collector/model/otlp"
 	"go.opentelemetry.io/collector/model/pdata"
 )
@@ -55,6 +56,11 @@ var (
 	tracesMarshaler  = otlp.NewProtobufTracesMarshaler()
 	metricsMarshaler = otlp.NewProtobufMetricsMarshaler()
 	logsMarshaler    = otlp.NewProtobufLogsMarshaler()
+
+	// debug propose
+	debugTraceMarhsaller  = otlptext.NewTextTracesMarshaler()
+	debugMetricMarshaller = otlptext.NewTextMetricsMarshaler()
+	debugLoggerMarshaller = otlptext.NewTextLogsMarshaler()
 )
 
 const (
@@ -100,6 +106,10 @@ func (e *exporter) start(_ context.Context, host component.Host) error {
 }
 
 func (e *exporter) pushTraces(ctx context.Context, td pdata.Traces) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextTracesWithErrorHandled(td)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextTracesWithErrorHandled(td) })
+	}
 	request, err := tracesMarshaler.MarshalTraces(td)
 	if err != nil {
 		return consumererror.Permanent(err)
@@ -109,6 +119,10 @@ func (e *exporter) pushTraces(ctx context.Context, td pdata.Traces) error {
 }
 
 func (e *exporter) pushMetrics(ctx context.Context, md pdata.Metrics) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextMetricsWithErrorHandled(md)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(md) })
+	}
 	request, err := metricsMarshaler.MarshalMetrics(md)
 	if err != nil {
 		return consumererror.Permanent(err)
@@ -117,6 +131,10 @@ func (e *exporter) pushMetrics(ctx context.Context, md pdata.Metrics) error {
 }
 
 func (e *exporter) pushLogs(ctx context.Context, ld pdata.Logs) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextLogsWithErrorHandled(ld)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(ld) })
+	}
 	request, err := logsMarshaler.MarshalLogs(ld)
 	if err != nil {
 		return consumererror.Permanent(err)
@@ -212,4 +230,39 @@ func readResponse(resp *http.Response) *status.Status {
 	}
 
 	return respStatus
+}
+
+func (e *exporter) logTextMetricsWithErrorHandled(d interface{}) string {
+	buf, err := debugMetricMarshaller.MarshalMetrics(d.(pdata.Metrics))
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for metrics: %v", zap.Error(err))
+		return "Text marshal metrics failed for metrics."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logTextTracesWithErrorHandled(td pdata.Traces) string {
+	buf, err := debugTraceMarhsaller.MarshalTraces(td)
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for traces: %v", zap.Error(err))
+		return "Text marshal metrics failed for traces."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logTextLogsWithErrorHandled(ld pdata.Logs) string {
+	buf, err := debugLoggerMarshaller.MarshalLogs(ld)
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for logs: %v", zap.Error(err))
+		return "Text marshal metrics failed for logs."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logAndRethrowIfPanic(beforeMarshal string, marshalWithErrorHandled func() string) {
+	if r := recover(); r != nil {
+		e.logger.Debug("Before panic: " + beforeMarshal)
+		e.logger.Debug("Panic: " + marshalWithErrorHandled())
+		panic(r)
+	}
 }
