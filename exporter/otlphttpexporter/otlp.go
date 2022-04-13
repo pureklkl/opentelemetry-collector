@@ -19,6 +19,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/collector/exporter/exporterhelper"
+	"google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -28,19 +31,18 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/protobuf/proto"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer/consumererror"
-	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/pmetric/pmetricotlp"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
+	"go.opentelemetry.io/collector/internal/otlptext"
+	"go.opentelemetry.io/collector/model/pdata"
 )
 
 type exporter struct {
@@ -54,6 +56,11 @@ type exporter struct {
 	settings   component.TelemetrySettings
 	// Default user-agent header.
 	userAgent string
+
+	// debug purpose
+	debugLogsMarshaler    pdata.LogsMarshaler
+	debugMetricsMarshaler pdata.MetricsMarshaler
+	debugTracesMarshaler  pdata.TracesMarshaler
 }
 
 const (
@@ -81,6 +88,10 @@ func newExporter(cfg config.Exporter, set component.ExporterCreateSettings) (*ex
 		logger:    set.Logger,
 		userAgent: userAgent,
 		settings:  set.TelemetrySettings,
+
+		debugLogsMarshaler:    otlptext.NewTextLogsMarshaler(),
+		debugMetricsMarshaler: otlptext.NewTextMetricsMarshaler(),
+		debugTracesMarshaler:  otlptext.NewTextTracesMarshaler(),
 	}, nil
 }
 
@@ -96,6 +107,10 @@ func (e *exporter) start(_ context.Context, host component.Host) error {
 }
 
 func (e *exporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextTracesWithErrorHandled(td)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextTracesWithErrorHandled(td) })
+	}
 	tr := ptraceotlp.NewRequestFromTraces(td)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -106,6 +121,10 @@ func (e *exporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
 }
 
 func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextMetricsWithErrorHandled(md)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(md) })
+	}
 	tr := pmetricotlp.NewRequestFromMetrics(md)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -115,6 +134,10 @@ func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 }
 
 func (e *exporter) pushLogs(ctx context.Context, ld plog.Logs) error {
+	if e.logger.Core().Enabled(zap.DebugLevel) {
+		beforeMarshal := e.logTextLogsWithErrorHandled(ld)
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(ld) })
+	}
 	tr := plogotlp.NewRequestFromLogs(ld)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -212,4 +235,39 @@ func readResponse(resp *http.Response) *status.Status {
 	}
 
 	return respStatus
+}
+
+func (e *exporter) logTextMetricsWithErrorHandled(d interface{}) string {
+	buf, err := e.debugMetricsMarshaler.MarshalMetrics(d.(pdata.Metrics))
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for metrics: %v", zap.Error(err))
+		return "Text marshal metrics failed for metrics."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logTextTracesWithErrorHandled(td pdata.Traces) string {
+	buf, err := e.debugTracesMarshaler.MarshalTraces(td)
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for traces: %v", zap.Error(err))
+		return "Text marshal metrics failed for traces."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logTextLogsWithErrorHandled(ld pdata.Logs) string {
+	buf, err := e.debugLogsMarshaler.MarshalLogs(ld)
+	if err != nil {
+		e.logger.Debug("Text Marshal failed for logs: %v", zap.Error(err))
+		return "Text marshal metrics failed for logs."
+	}
+	return string(buf)
+}
+
+func (e *exporter) logAndRethrowIfPanic(beforeMarshal string, marshalWithErrorHandled func() string) {
+	if r := recover(); r != nil {
+		e.logger.Debug("Before panic: " + beforeMarshal)
+		e.logger.Debug("Panic: " + marshalWithErrorHandled())
+		panic(r)
+	}
 }
