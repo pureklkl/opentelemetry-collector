@@ -259,6 +259,8 @@ func (col *Collector) Run(ctx context.Context) error {
 		zap.Int("NumCPU", runtime.NumCPU()),
 	)
 
+	col.logger.Warn("You are running a private build collector.")
+
 	// Everything is ready, now run until an event requiring shutdown happens.
 	return col.runAndWaitForShutdownEvent(ctx)
 }
