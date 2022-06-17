@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/collector/internal/otlptext"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -54,6 +55,10 @@ type exporter struct {
 	settings   component.TelemetrySettings
 	// Default user-agent header.
 	userAgent string
+
+	logsMarshaler    plog.Marshaler
+	metricsMarshaler pmetric.Marshaler
+	tracesMarshaler  ptrace.Marshaler
 }
 
 const (
@@ -81,6 +86,10 @@ func newExporter(cfg config.Exporter, set component.ExporterCreateSettings) (*ex
 		logger:    set.Logger,
 		userAgent: userAgent,
 		settings:  set.TelemetrySettings,
+
+		logsMarshaler: otlptext.NewTextLogsMarshaler(),
+		metricsMarshaler: otlptext.NewTextMetricsMarshaler(),
+		tracesMarshaler: otlptext.NewTextTracesMarshaler(),
 	}, nil
 }
 
@@ -101,8 +110,11 @@ func (e *exporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
 	if err != nil {
 		return consumererror.NewPermanent(err)
 	}
-
-	return e.export(ctx, e.tracesURL, request)
+	buf, err := e.tracesMarshaler.MarshalTraces(td)
+	if err != nil {
+		return consumererror.NewPermanent(err)
+	}
+	return e.export(ctx, e.tracesURL, request, string(buf))
 }
 
 func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
@@ -111,7 +123,11 @@ func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 	if err != nil {
 		return consumererror.NewPermanent(err)
 	}
-	return e.export(ctx, e.metricsURL, request)
+	buf, err := e.metricsMarshaler.MarshalMetrics(md)
+	if err != nil {
+		return consumererror.NewPermanent(err)
+	}
+	return e.export(ctx, e.metricsURL, request, string(buf))
 }
 
 func (e *exporter) pushLogs(ctx context.Context, ld plog.Logs) error {
@@ -120,11 +136,14 @@ func (e *exporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	if err != nil {
 		return consumererror.NewPermanent(err)
 	}
-
-	return e.export(ctx, e.logsURL, request)
+	buf, err := e.logsMarshaler.MarshalLogs(ld)
+	if err != nil {
+		return consumererror.NewPermanent(err)
+	}
+	return e.export(ctx, e.logsURL, request, string(buf))
 }
 
-func (e *exporter) export(ctx context.Context, url string, request []byte) error {
+func (e *exporter) export(ctx context.Context, url string, request []byte, body string) error {
 	e.logger.Debug("Preparing to make HTTP request", zap.String("url", url))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(request))
 	if err != nil {
@@ -132,8 +151,10 @@ func (e *exporter) export(ctx context.Context, url string, request []byte) error
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("User-Agent", e.userAgent)
-
+	reqString := fmt.Sprintf("request: %v\nbody: %s\n", req, body)
 	resp, err := e.client.Do(req)
+	respString := fmt.Sprintf("response: %v\n", resp)
+	e.logger.Info(fmt.Sprintf("%s%s", reqString, respString))
 	if err != nil {
 		return fmt.Errorf("failed to make an HTTP request: %w", err)
 	}
