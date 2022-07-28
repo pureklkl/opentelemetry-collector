@@ -35,14 +35,14 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer/consumererror"
+	"go.opentelemetry.io/collector/internal/otlptext"
+	"go.opentelemetry.io/collector/model/pdata"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/pmetric/pmetricotlp"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
-	"go.opentelemetry.io/collector/internal/otlptext"
-	"go.opentelemetry.io/collector/model/pdata"
 )
 
 type exporter struct {
@@ -58,9 +58,9 @@ type exporter struct {
 	userAgent string
 
 	// debug purpose
-	debugLogsMarshaler    pdata.LogsMarshaler
-	debugMetricsMarshaler pdata.MetricsMarshaler
-	debugTracesMarshaler  pdata.TracesMarshaler
+	debugLogsMarshaler    plog.Marshaler
+	debugMetricsMarshaler pmetric.Marshaler
+	debugTracesMarshaler  ptrace.Marshaler
 }
 
 const (
