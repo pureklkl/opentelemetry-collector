@@ -36,7 +36,6 @@ import (
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/consumer/consumererror"
 	"go.opentelemetry.io/collector/internal/otlptext"
-	"go.opentelemetry.io/collector/model/pdata"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/plog/plogotlp"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -136,7 +135,7 @@ func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 func (e *exporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	if e.logger.Core().Enabled(zap.DebugLevel) {
 		beforeMarshal := e.logTextLogsWithErrorHandled(ld)
-		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(ld) })
+		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextLogsWithErrorHandled(ld) })
 	}
 	tr := plogotlp.NewRequestFromLogs(ld)
 	request, err := tr.MarshalProto()
@@ -237,8 +236,8 @@ func readResponse(resp *http.Response) *status.Status {
 	return respStatus
 }
 
-func (e *exporter) logTextMetricsWithErrorHandled(d interface{}) string {
-	buf, err := e.debugMetricsMarshaler.MarshalMetrics(d.(pdata.Metrics))
+func (e *exporter) logTextMetricsWithErrorHandled(md pmetric.Metrics) string {
+	buf, err := e.debugMetricsMarshaler.MarshalMetrics(md)
 	if err != nil {
 		e.logger.Debug("Text Marshal failed for metrics: %v", zap.Error(err))
 		return "Text marshal metrics failed for metrics."
@@ -246,7 +245,7 @@ func (e *exporter) logTextMetricsWithErrorHandled(d interface{}) string {
 	return string(buf)
 }
 
-func (e *exporter) logTextTracesWithErrorHandled(td pdata.Traces) string {
+func (e *exporter) logTextTracesWithErrorHandled(td ptrace.Traces) string {
 	buf, err := e.debugTracesMarshaler.MarshalTraces(td)
 	if err != nil {
 		e.logger.Debug("Text Marshal failed for traces: %v", zap.Error(err))
@@ -255,7 +254,7 @@ func (e *exporter) logTextTracesWithErrorHandled(td pdata.Traces) string {
 	return string(buf)
 }
 
-func (e *exporter) logTextLogsWithErrorHandled(ld pdata.Logs) string {
+func (e *exporter) logTextLogsWithErrorHandled(ld plog.Logs) string {
 	buf, err := e.debugLogsMarshaler.MarshalLogs(ld)
 	if err != nil {
 		e.logger.Debug("Text Marshal failed for logs: %v", zap.Error(err))
