@@ -106,10 +106,9 @@ func (e *exporter) start(_ context.Context, host component.Host) error {
 }
 
 func (e *exporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
-	if e.logger.Core().Enabled(zap.DebugLevel) {
-		beforeMarshal := e.logTextTracesWithErrorHandled(td)
-		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextTracesWithErrorHandled(td) })
-	}
+	beforeMarshal := e.logTextTracesWithErrorHandled(td)
+	defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextTracesWithErrorHandled(td) })
+
 	tr := ptraceotlp.NewRequestFromTraces(td)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -120,10 +119,9 @@ func (e *exporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
 }
 
 func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
-	if e.logger.Core().Enabled(zap.DebugLevel) {
-		beforeMarshal := e.logTextMetricsWithErrorHandled(md)
-		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(md) })
-	}
+	beforeMarshal := e.logTextMetricsWithErrorHandled(md)
+	defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextMetricsWithErrorHandled(md) })
+
 	tr := pmetricotlp.NewRequestFromMetrics(md)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -133,10 +131,9 @@ func (e *exporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 }
 
 func (e *exporter) pushLogs(ctx context.Context, ld plog.Logs) error {
-	if e.logger.Core().Enabled(zap.DebugLevel) {
-		beforeMarshal := e.logTextLogsWithErrorHandled(ld)
-		defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextLogsWithErrorHandled(ld) })
-	}
+	beforeMarshal := e.logTextLogsWithErrorHandled(ld)
+	defer e.logAndRethrowIfPanic(beforeMarshal, func() string { return e.logTextLogsWithErrorHandled(ld) })
+
 	tr := plogotlp.NewRequestFromLogs(ld)
 	request, err := tr.MarshalProto()
 	if err != nil {
@@ -239,7 +236,7 @@ func readResponse(resp *http.Response) *status.Status {
 func (e *exporter) logTextMetricsWithErrorHandled(md pmetric.Metrics) string {
 	buf, err := e.debugMetricsMarshaler.MarshalMetrics(md)
 	if err != nil {
-		e.logger.Debug("Text Marshal failed for metrics: %v", zap.Error(err))
+		e.logger.Info("Text Marshal failed for metrics: %v", zap.Error(err))
 		return "Text marshal metrics failed for metrics."
 	}
 	return string(buf)
@@ -248,7 +245,7 @@ func (e *exporter) logTextMetricsWithErrorHandled(md pmetric.Metrics) string {
 func (e *exporter) logTextTracesWithErrorHandled(td ptrace.Traces) string {
 	buf, err := e.debugTracesMarshaler.MarshalTraces(td)
 	if err != nil {
-		e.logger.Debug("Text Marshal failed for traces: %v", zap.Error(err))
+		e.logger.Info("Text Marshal failed for traces: %v", zap.Error(err))
 		return "Text marshal metrics failed for traces."
 	}
 	return string(buf)
@@ -257,7 +254,7 @@ func (e *exporter) logTextTracesWithErrorHandled(td ptrace.Traces) string {
 func (e *exporter) logTextLogsWithErrorHandled(ld plog.Logs) string {
 	buf, err := e.debugLogsMarshaler.MarshalLogs(ld)
 	if err != nil {
-		e.logger.Debug("Text Marshal failed for logs: %v", zap.Error(err))
+		e.logger.Info("Text Marshal failed for logs: %v", zap.Error(err))
 		return "Text marshal metrics failed for logs."
 	}
 	return string(buf)
@@ -265,8 +262,8 @@ func (e *exporter) logTextLogsWithErrorHandled(ld plog.Logs) string {
 
 func (e *exporter) logAndRethrowIfPanic(beforeMarshal string, marshalWithErrorHandled func() string) {
 	if r := recover(); r != nil {
-		e.logger.Debug("Before panic: " + beforeMarshal)
-		e.logger.Debug("Panic: " + marshalWithErrorHandled())
+		e.logger.Info("Before panic: " + beforeMarshal)
+		e.logger.Info("Panic: " + marshalWithErrorHandled())
 		panic(r)
 	}
 }
